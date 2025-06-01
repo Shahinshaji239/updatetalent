@@ -1,0 +1,337 @@
+/* Wrapper for the entire authentication section */
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+.auth-wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: #ffffff;
+  font-family: 'Poppins', sans-serif;
+  padding: 4rem 2rem; /* Increased padding for breathing room */
+}
+
+/* Logo styling */
+.auth-logo {
+  margin-bottom: 1.5rem;
+}
+
+/* Main title */
+.auth-title {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #000;
+  margin-bottom: 0.5rem;
+}
+
+/* Subtitle */
+.auth-subtitle {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 1.5rem;
+}
+
+/* Toggle buttons container */
+.auth-toggle {
+  display: flex;
+  width: 100%;
+  max-width: 400px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Individual toggle buttons */
+.toggle-btn {
+  flex: 1;
+  padding: 0.7rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  background: #fff;
+  color: #666;
+  cursor: pointer;
+  transition: background 0.3s, color 0.3s;
+}
+
+.toggle-btn.active {
+  background: #a7a7a7;
+  color: #000;
+}
+
+/* Authentication card */
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background-color: #ffffff;
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  border-radius: 8px; /* Rounded corners */
+}
+
+/* Form group styling */
+.form-group {
+  margin-bottom: 1.2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+  color: #fff;
+}
+
+/* Form inputs */
+.form-group input {
+  padding: 0.75rem;
+  font-size: 1rem;
+  border-radius: 8px; /* Rounded edges */
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #000;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s; /* Smooth focus effect */
+}
+
+.form-group input:focus {
+  border-color:var(--primary-color); /* Blue focus border */
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25); /* Glow effect */
+}
+
+.form-group input::placeholder {
+  color: #aaa;
+}
+
+/* Submit button */
+.auth-button {
+  width: 100%;
+  padding: 1rem; /* Larger for better usability */
+  background-color: #000;
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.2s; /* Hover animation */
+}
+
+.auth-button:hover {
+  background-color: #333;
+  transform: translateY(-2px); /* Slight lift on hover */
+}
+
+/* Forgot password link */
+.forgot-password {
+  margin-top: 1.2rem;
+  font-size: 0.85rem;
+  color: #444;
+  text-align: center;
+}
+
+.forgot-password a {
+  color: #000;
+  text-decoration: none;
+}
+
+.forgot-password a:hover {
+  text-decoration: underline;
+}
+
+/* Error message */
+.error-msg {
+  color: #dc2626; /* Red for visibility */
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Modal overlay (applies to all modals) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6); /* Slightly darker overlay */
+  display: flex;
+  justify-content: center; /* Centers horizontally */
+  align-items: center; /* Centers vertically */
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-in; /* Fade-in effect */
+}
+
+/* Modal content */
+.modal {
+  background-color: #ffffff;
+  padding: 2rem;
+  width: 100%;
+  max-width: 400px;
+  border-radius: 12px; /* More rounded corners */
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); /* Deeper shadow */
+  animation: scaleIn 0.3s ease; /* Scale-in animation */
+  text-align: center;
+  max-height: 90vh; /* Limit modal height to prevent overflow on smaller screens */
+  overflow-y: auto; /* Enable scrolling if content exceeds max-height */
+  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+}
+.modal form {
+    margin: 0; /* Remove any default form margins that might push content */
+}
+
+/* Modal title */
+.modal h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #1f2937;
+}
+
+/* Modal text */
+.modal p {
+  font-size: 1rem;
+  color: #4b5563;
+  margin-bottom: 1.5rem;
+}
+
+/* Modal input */
+.modal input[type="text"],
+.modal input[type="email"] {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  background: #f9fafb;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.modal input[type="text"]:focus,
+.modal input[type="email"]:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(236, 236, 236, 0.25);
+}
+
+/* Modal buttons */
+.modal button {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 0.5rem;
+  transition: background-color 0.3s, transform 0.2s;
+}
+
+/* Submit button in modal */
+.modal button[type="submit"] {
+  background-color: #111827;
+  color: #ffffff;
+}
+
+.modal button[type="submit"]:hover {
+  background-color: #1f2937;
+  transform: translateY(-2px);
+}
+
+/* Secondary button in modal (e.g., Resend, Close) */
+.modal button:not([type="submit"]) {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.modal button:not([type="submit"]):hover {
+  background-color: #d1d5db;
+  transform: translateY(-2px);
+}
+
+/* Animations */
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    background-color: rgba(0, 0, 0, 0);
+  }
+  to {
+    background-color: rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .auth-wrapper {
+    padding: 2rem 1rem;
+  }
+
+  .auth-card {
+    padding: 1.5rem;
+  }
+
+  .modal {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-title {
+    font-size: 1.5rem;
+  }
+
+  .auth-subtitle {
+    font-size: 0.8rem;
+  }
+
+  .form-group input {
+    padding: 0.6rem;
+    font-size: 0.9rem;
+  }
+
+  .auth-button {
+    padding: 0.8rem;
+    font-size: 0.9rem;
+  }
+
+  .modal h3 {
+    font-size: 1.2rem;
+  }
+
+  .modal p {
+    font-size: 0.9rem;
+  }
+
+  .modal input[type="text"],
+  .modal input[type="email"] {
+    padding: 0.6rem;
+    font-size: 0.9rem;
+  }
+
+  .modal button {
+    padding: 0.6rem;
+    font-size: 0.9rem;
+  }
+
+  .toggle-btn {
+    padding: 0.5rem;
+    font-size: 0.9rem;
+  }
+}

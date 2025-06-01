@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Dashboard</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      padding: 2rem;
+      color: #111827;
+    }
+
+    h1 {
+      margin-bottom: 1rem;
+    }
+
+    .metrics {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      flex: 1;
+      background: white;
+      padding: 1rem 1.5rem;
+      border-radius: 10px;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .card h3 {
+      margin-bottom: 0.5rem;
+    }
+
+    .search-bar {
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .search-bar input {
+      padding: 0.6rem 1rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      width: 300px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    thead {
+      background: #e5e7eb;
+    }
+
+    th, td {
+      padding: 0.9rem 1.2rem;
+      text-align: center;
+      border-bottom: 1px solid #eee;
+    }
+
+    tr:hover {
+      background-color: #f9fafb;
+    }
+
+    form {
+      display: inline;
+    }
+
+    button.block,
+    button.unblock {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .block {
+      background: #ef4444;
+      color: white;
+    }
+
+    .unblock {
+      background: #10b981;
+      color: white;
+    }
+
+    .pagination {
+      margin-top: 1rem;
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+    }
+
+    .pagination a {
+      padding: 0.6rem 1.2rem;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #333;
+    }
+
+    .pagination .active-page {
+      background: #3b82f6;
+      color: white;
+      font-weight: bold;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div style="text-align: right; margin-bottom: 1rem;">
+    <form method="post" action="{% url 'admin_logout' %}">
+      {% csrf_token %}
+      <button type="submit" style="
+        background-color: #ef4444;
+        color: white;
+        padding: 8px 14px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      ">
+        Logout
+      </button>
+    </form>
+  </div>
+  <h1>Welcome, Admin</h1>
+
+  <div class="metrics">
+    <div class="card">
+      <h3>Total Candidates</h3>
+      <p>{{ total_candidates }}</p>
+    </div>
+    <div class="card">
+      <h3>Growth</h3>
+      <p>{{ growth_percent }}%</p>
+    </div>
+  </div>
+
+  <div class="search-bar">
+    <h2>Recruiter Accounts</h2>
+    <form method="get">
+      <input type="text" name="search" value="{{ request.GET.search }}" placeholder="Search by name or email..." />
+    </form>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Status</th>
+        <th>Candidates Added</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in page_obj %}
+        <tr>
+          <td>{{ user.name }}</td>
+          <td>{{ user.email }}</td>
+          <td>{% if user.is_blocked %}Blocked{% else %}Active{% endif %}</td>
+          <td>{{ user.candidate_count }}</td>
+          <td>
+            <form method="post" action="{% url 'admin-toggle-user' user.id %}">
+              {% csrf_token %}
+              {% if user.is_blocked %}
+                <button type="submit" class="unblock">Unblock</button>
+              {% else %}
+                <button type="submit" class="block">Block</button>
+              {% endif %}
+            </form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5">No users found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if page_obj.has_other_pages %}
+    <div class="pagination">
+      {% if page_obj.has_previous %}
+        <a href="?search={{ request.GET.search }}&page={{ page_obj.previous_page_number }}">Prev</a>
+      {% endif %}
+      <span class="active-page">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a href="?search={{ request.GET.search }}&page={{ page_obj.next_page_number }}">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</body>
+</html>
