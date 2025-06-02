@@ -57,12 +57,48 @@ html, body {
   background: #fff;
   color: #666;
   cursor: pointer;
-  transition: background 0.3s, color 0.3s;
+  transition: all 0.3s ease;
 }
 
 .toggle-btn.active {
-  background: #a7a7a7;
+  background: #000;
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Password input container */
+.password-input-container {
+  position: relative;
+  width: 100%;
+}
+
+.password-input-container input {
+  padding-right: 40px; /* Make room for the eye icon */
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.password-toggle:hover {
   color: #000;
+}
+
+.password-toggle svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* Authentication card */
@@ -88,31 +124,70 @@ html, body {
   color: #fff;
 }
 
-/* Form inputs */
-.form-group input {
-  padding: 0.75rem;
-  font-size: 1rem;
-  border-radius: 8px; /* Rounded edges */
-  border: 1px solid #ccc;
-  background: #fff;
-  color: #000;
+/* Standardized Input Styles */
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  color: var(--text-primary);
+  background-color: var(--background-white);
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Override autofill styles */
+.form-group input:-webkit-autofill,
+.form-group input:-webkit-autofill:hover,
+.form-group input:-webkit-autofill:focus,
+.form-group input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
-  transition: border-color 0.3s, box-shadow 0.3s; /* Smooth focus effect */
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
 }
 
-.form-group input:focus {
-  border-color:var(--primary-color); /* Blue focus border */
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25); /* Glow effect */
+.form-group input::placeholder,
+.form-group select::placeholder,
+.form-group textarea::placeholder {
+  color: var(--text-secondary);
 }
 
-.form-group input::placeholder {
-  color: #aaa;
+/* Remove default select styling */
+.form-group select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 36px;
+}
+
+/* Style for disabled inputs */
+.form-group input:disabled,
+.form-group select:disabled,
+.form-group textarea:disabled {
+  background-color: var(--background-light);
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 /* Submit button */
 .auth-button {
   width: 100%;
-  padding: 1rem; /* Larger for better usability */
+  padding: 1rem;
   background-color: #000;
   border: none;
   color: #fff;
@@ -120,12 +195,20 @@ html, body {
   font-weight: bold;
   border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.3s, transform 0.2s; /* Hover animation */
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
 
 .auth-button:hover {
   background-color: #333;
-  transform: translateY(-2px); /* Slight lift on hover */
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.auth-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* Forgot password link */
@@ -159,101 +242,69 @@ html, body {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.6); /* Slightly darker overlay */
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
-  justify-content: center; /* Centers horizontally */
-  align-items: center; /* Centers vertically */
+  justify-content: center;
+  align-items: center;
   z-index: 1000;
-  animation: fadeIn 0.3s ease-in; /* Fade-in effect */
 }
 
 /* Modal content */
 .modal {
-  background-color: #ffffff;
+  background: white;
   padding: 2rem;
+  border-radius: 8px;
   width: 100%;
   max-width: 400px;
-  border-radius: 12px; /* More rounded corners */
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); /* Deeper shadow */
-  animation: scaleIn 0.3s ease; /* Scale-in animation */
-  text-align: center;
-  max-height: 90vh; /* Limit modal height to prevent overflow on smaller screens */
-  overflow-y: auto; /* Enable scrolling if content exceeds max-height */
-  box-sizing: border-box; /* Include padding and border in the element's total width and height */
-}
-.modal form {
-    margin: 0; /* Remove any default form margins that might push content */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* Modal title */
 .modal h3 {
   font-size: 1.5rem;
   font-weight: 600;
-  margin-bottom: 1rem;
-  color: #1f2937;
+  color: #000;
+  margin-bottom: 0.5rem;
 }
 
-/* Modal text */
 .modal p {
-  font-size: 1rem;
-  color: #4b5563;
+  color: #666;
   margin-bottom: 1.5rem;
 }
 
-/* Modal input */
-.modal input[type="text"],
-.modal input[type="email"] {
-  width: 100%;
-  padding: 0.75rem;
-  font-size: 1rem;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+.modal .form-group {
   margin-bottom: 1rem;
-  background: #f9fafb;
-  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-.modal input[type="text"]:focus,
-.modal input[type="email"]:focus {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(236, 236, 236, 0.25);
-}
-
-/* Modal buttons */
-.modal button {
+.modal .form-group input {
   width: 100%;
   padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
   font-size: 1rem;
+}
+
+.modal .auth-button {
+  width: 100%;
+  padding: 0.75rem;
+  background: #000;
+  color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  font-weight: 500;
-  margin-top: 0.5rem;
-  transition: background-color 0.3s, transform 0.2s;
+  transition: background-color 0.2s;
 }
 
-/* Submit button in modal */
-.modal button[type="submit"] {
-  background-color: #111827;
-  color: #ffffff;
+.modal .auth-button:hover {
+  background: #333;
 }
 
-.modal button[type="submit"]:hover {
-  background-color: #1f2937;
-  transform: translateY(-2px);
-}
-
-/* Secondary button in modal (e.g., Resend, Close) */
-.modal button:not([type="submit"]) {
-  background-color: #e5e7eb;
-  color: #374151;
-}
-
-.modal button:not([type="submit"]):hover {
-  background-color: #d1d5db;
-  transform: translateY(-2px);
+.modal .auth-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
 }
 
 /* Animations */

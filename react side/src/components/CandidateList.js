@@ -7,6 +7,18 @@ import Select from 'react-select';
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
 
+// API endpoints
+const API_BASE_URL = 'http://localhost:8000';
+const ENDPOINTS = {
+  candidates: `${API_BASE_URL}/candidates/`,
+  addCandidate: `${API_BASE_URL}/add-candidate/`,
+  updateCandidate: (id) => `${API_BASE_URL}/update_candidate/${id}/`,
+  deleteCandidate: (id) => `${API_BASE_URL}/candidates/${id}/delete/`,
+  searchCandidates: `${API_BASE_URL}/search-candidates/`,
+  bulkImport: `${API_BASE_URL}/bulk-import-excel/`,
+  exportCandidates: `${API_BASE_URL}/export-candidates-excel/`
+};
+
 const CandidatesList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,28 +37,68 @@ const CandidatesList = () => {
   const [exportFilters, setExportFilters] = useState({ role: '', experience: '', location: '' });
   const [selectedImportFile, setSelectedImportFile] = useState(null);
   const [activeDropdownId, setActiveDropdownId] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({
+    role: '',
+    experience: '',
+    location: ''
+  });
+  const [filteredCandidates, setFilteredCandidates] = useState([]);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const location = useLocation();
 
+  // Error handling utility
+  const handleApiError = (error) => {
+    console.error('API Error:', error);
+    if (error.response?.status === 401) {
+      alert('Session expired. Please log in again.');
+      localStorage.clear();
+      window.location.href = '/';
+    } else {
+      setError(error.response?.data?.error || 'An error occurred');
+      setTimeout(() => setError(null), 5000); // Clear error after 5 seconds
+    }
+  };
+
+  // Validation utility
+  const validateCandidate = (candidate) => {
+    const errors = [];
+    if (!candidate.name) errors.push('Name is required');
+    if (!candidate.email) errors.push('Email is required');
+    if (!candidate.role) errors.push('Role is required');
+    if (!candidate.location) errors.push('Location is required');
+    if (!candidate.experience) errors.push('Experience is required');
+    
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (candidate.email && !emailRegex.test(candidate.email)) {
+      errors.push('Invalid email format');
+    }
+    
+    return errors;
+  };
+
   const fetchCandidates = async () => {
+    setIsLoading(true);
+    setError(null);
     const token = localStorage.getItem('token');
     if (!token) {
-      console.warn('No token found, redirecting to login');
+      handleApiError({ response: { status: 401 } });
       return;
     }
 
     try {
-      const res = await axios.get('http://localhost:8000/candidates/', {
+      const res = await axios.get(ENDPOINTS.candidates, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setCandidates(res.data);
     } catch (err) {
-      console.error('Error fetching candidates:', err.response?.data || err.message);
-      if (err.response?.status === 401) {
-        alert('Session expired. Please log in again.');
-        localStorage.clear();
-        window.location.href = '/';
-      }
+      handleApiError(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -112,50 +164,49 @@ const CandidatesList = () => {
     { value: 'Prototyping', label: 'Prototyping' },
   ];
 
+  const handleSearch = async (e) => {
+    const query = e.target.value;
+    setSearchTerm(query);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${ENDPOINTS.searchCandidates}?q=${query}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCandidates(response.data);
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleAddCandidate = async () => {
-    if (!newCandidate || typeof newCandidate !== 'object') {
-      console.error("Invalid candidate data");
+    const validationErrors = validateCandidate(newCandidate);
+    if (validationErrors.length > 0) {
+      alert(validationErrors.join('\n'));
       return;
     }
 
-    // Validation
-    if (!newCandidate.name || !newCandidate.email || !newCandidate.role || !newCandidate.location || !newCandidate.experience) {
-      alert('Please fill in all required fields: Name, Email, Role, Location, and Experience.');
-      return;
-    }
+    setIsLoading(true);
+    setError(null);
 
     try {
       const formData = new FormData();
-
-      // Handle all fields properly
-      formData.append('name', newCandidate.name || '');
-      formData.append('email', newCandidate.email || '');
-      formData.append('role', newCandidate.role || '');
-      formData.append('location', newCandidate.location || '');
-      formData.append('experience', newCandidate.experience || '');
-      formData.append('industry', newCandidate.industry || '');
-      formData.append('gender', newCandidate.gender || '');
-      formData.append('current_ctc', newCandidate.current_ctc || '');
-      formData.append('expected_ctc', newCandidate.expected_ctc || '');
-      formData.append('notes', newCandidate.notes || '');
-
-      // Handle skills - send as comma-separated string to match backend expectation
-      if (newCandidate.skills && newCandidate.skills.length > 0) {
-        formData.append('skills', newCandidate.skills.join(','));
-      }
-
-      // Handle resume file
-      if (newCandidate.resume instanceof File) {
-        formData.append('resume', newCandidate.resume);
-      }
+      Object.keys(newCandidate).forEach(key => {
+        if (key === 'skills' && newCandidate[key].length > 0) {
+          formData.append(key, newCandidate[key].join(','));
+        } else if (key === 'resume' && newCandidate[key] instanceof File) {
+          formData.append(key, newCandidate[key]);
+        } else if (newCandidate[key]) {
+          formData.append(key, newCandidate[key]);
+        }
+      });
 
       const token = localStorage.getItem('token');
-      if (!token) {
-        alert('Authentication required.');
-        return;
-      }
-
-      await axios.post('http://localhost:8000/add-candidate/', formData, {
+      await axios.post(ENDPOINTS.addCandidate, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
@@ -166,46 +217,47 @@ const CandidatesList = () => {
       closeModal();
       alert('Candidate added successfully!');
     } catch (err) {
-      console.error('Error adding candidate:', err);
-      alert(err.response?.data?.error || 'Failed to add candidate.');
+      handleApiError(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleEditCandidate = async () => {
     if (!selectedCandidate) return;
 
+    const validationErrors = validateCandidate(selectedCandidate);
+    if (validationErrors.length > 0) {
+      alert(validationErrors.join('\n'));
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
     try {
       const formData = new FormData();
-
-      // Handle all fields properly
-      formData.append('name', selectedCandidate.name || '');
-      formData.append('email', selectedCandidate.email || '');
-      formData.append('role', selectedCandidate.role || '');
-      formData.append('location', selectedCandidate.location || '');
-      formData.append('experience', selectedCandidate.experience || '');
-      formData.append('industry', selectedCandidate.industry || '');
-      formData.append('gender', selectedCandidate.gender || '');
-      formData.append('current_ctc', selectedCandidate.current_ctc || selectedCandidate.currentCTC || '');
-      formData.append('expected_ctc', selectedCandidate.expected_ctc || selectedCandidate.expectedCTC || '');
-      formData.append('notes', selectedCandidate.notes || '');
-
-      // Handle skills - send as comma-separated string to match backend expectation
-      if (selectedCandidate.skills && selectedCandidate.skills.length > 0) {
-        formData.append('skills', selectedCandidate.skills.join(','));
-      }
-
-      // Handle resume file - only if it's a new file
-      if (selectedCandidate.resume instanceof File) {
-        formData.append('resume', selectedCandidate.resume);
-      }
+      Object.keys(selectedCandidate).forEach(key => {
+        if (key === 'skills' && selectedCandidate[key].length > 0) {
+          formData.append(key, selectedCandidate[key].join(','));
+        } else if (key === 'resume' && selectedCandidate[key] instanceof File) {
+          formData.append(key, selectedCandidate[key]);
+        } else if (selectedCandidate[key]) {
+          formData.append(key, selectedCandidate[key]);
+        }
+      });
 
       const token = localStorage.getItem('token');
-      const response = await axios.put(`http://localhost:8000/update_candidate/${selectedCandidate.id}/`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await axios.put(
+        ENDPOINTS.updateCandidate(selectedCandidate.id),
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
 
       if (response.status === 200) {
         fetchCandidates();
@@ -213,8 +265,9 @@ const CandidatesList = () => {
         alert('Candidate updated successfully!');
       }
     } catch (err) {
-      console.error('Error editing candidate:', err.response?.data || err);
-      alert(err.response?.data?.error || 'Failed to update candidate.');
+      handleApiError(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -225,75 +278,50 @@ const CandidatesList = () => {
       return;
     }
 
+    setIsLoading(true);
+    setError(null);
+
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:8000/candidates/${selectedCandidate.id}/delete/`, {
+      await axios.delete(ENDPOINTS.deleteCandidate(selectedCandidate.id), {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchCandidates();
       closeModal();
       alert('Candidate deleted successfully!');
     } catch (err) {
-      console.error('Error deleting candidate:', err);
-      alert('Failed to delete candidate.');
+      handleApiError(err);
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const handleSearch = async (e) => {
-    const query = e.target.value;
-    setSearchTerm(query);
-
-    try {
-      const token = localStorage.getItem('token');
-
-      if (query.trim() === '') {
-        // If search is empty, fetch all candidates
-        fetchCandidates();
-      } else {
-        // Use the search endpoint
-        const res = await axios.get(`http://localhost:8000/candidates/search/?q=${encodeURIComponent(query)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setCandidates(res.data);
-      }
-    } catch (err) {
-      console.error('Search error:', err);
-      // Fall back to client-side filtering if search endpoint fails
-      if (query.trim() === '') {
-        fetchCandidates();
-      }
-    }
-  };
-
-  // Client-side filtering as fallback
-  const filtered = candidates.filter((c) =>
-    [c.name, c.role, c.location, c.experience].some(
-      field => field?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
 
   const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files.length) return;
 
-    // File type validation
-    const allowedTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel'
-    ];
+    // Separate Excel file and resume files
+    const excelFile = Array.from(files).find(file => 
+      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.type === 'application/vnd.ms-excel'
+    );
+    
+    const resumeFiles = Array.from(files).filter(file => 
+      file.type === 'application/pdf'
+    );
 
-    if (!allowedTypes.includes(file.type)) {
+    if (!excelFile) {
       alert('Please upload a valid Excel file (.xlsx or .xls)');
       return;
     }
 
     // File size validation (10MB limit)
-    if (file.size > 10 * 1024 * 1024) {
+    if (excelFile.size > 10 * 1024 * 1024) {
       alert('File size too large. Please upload a file smaller than 10MB.');
       return;
     }
 
-    setSelectedImportFile(file);
+    setSelectedImportFile({ excel: excelFile, resumes: resumeFiles });
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -335,7 +363,11 @@ const CandidatesList = () => {
           });
 
           if (missingFields.length > 0) {
-            missingData.push({ row: index + 2, fields: missingFields });
+            missingData.push({ 
+              row: index + 2, 
+              fields: missingFields,
+              error: `Missing required fields: ${missingFields.join(', ')}`
+            });
           } else {
             validCount++;
           }
@@ -358,77 +390,62 @@ const CandidatesList = () => {
       alert('Error reading file. Please try again.');
     };
 
-    reader.readAsArrayBuffer(file);
+    reader.readAsArrayBuffer(excelFile);
   };
 
   const handleConfirmImport = async () => {
-    if (!selectedImportFile) {
-      alert('No file selected.');
-      return;
-    }
+    if (!selectedImportFile) return;
 
-    const formData = new FormData();
-    formData.append('file', selectedImportFile);
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert('Authentication required. Please log in again.');
-        return;
+      const formData = new FormData();
+      formData.append('file', selectedImportFile.excel);
+      
+      // Append resume files
+      if (selectedImportFile.resumes.length > 0) {
+        selectedImportFile.resumes.forEach(resume => {
+          formData.append('resumes', resume);
+        });
       }
 
-      const res = await axios.post('http://localhost:8000/bulk-import-excel/', formData, {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(ENDPOINTS.bulkImport, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-        timeout: 30000, // 30 second timeout
+          'Content-Type': 'multipart/form-data'
+        }
       });
 
-      const result = res.data;
-      if (res.status === 201) {
-        const message = `✅ Import Completed
-Created: ${result.created}
-Updated: ${result.updated}
-Skipped: ${result.skipped.length}`;
-
-        if (result.skipped.length > 0) {
-          const skippedDetails = result.skipped.slice(0, 5).map(s =>
-            `Row ${s.row}: ${s.error}`
-          ).join('\n');
-          alert(`${message}\n\nFirst few skipped rows:\n${skippedDetails}`);
-        } else {
-          alert(message);
-        }
-
-        fetchCandidates();
-        setImportPopup(false);
-        setImportData(null);
-        setImportSummary({ total: 0, missing: [], valid: 0 });
-        setSelectedImportFile(null);
-
-        // Clear the file input
-        const fileInput = document.getElementById('fileInput');
-        if (fileInput) {
-          fileInput.value = '';
-        }
-      } else {
-        alert('⚠ Import completed with issues.');
+      const { created, updated, skipped, total_rows_processed } = response.data;
+      
+      // Show detailed import summary
+      let summaryMessage = `Import completed:\n`;
+      summaryMessage += `- ${created} records created\n`;
+      summaryMessage += `- ${updated} records updated\n`;
+      
+      if (skipped.length > 0) {
+        summaryMessage += `\nSkipped records:\n`;
+        skipped.forEach(item => {
+          summaryMessage += `- Row ${item.row}: ${item.error}\n`;
+        });
       }
+      
+      alert(summaryMessage);
+      fetchCandidates();
+      setImportPopup(false);
     } catch (err) {
-      console.error('Bulk import failed:', err);
-      const errorMessage = err.response?.data?.error ||
-        err.response?.data?.message ||
-        err.message ||
-        'Something went wrong during import.';
-      alert(`Import failed: ${errorMessage}`);
+      handleApiError(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleOpenEditModal = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`http://localhost:8000/candidates/${id}/`, {
+      const res = await axios.get(`${ENDPOINTS.candidates}${id}/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -437,7 +454,7 @@ Skipped: ${result.skipped.length}`;
         ...fullData,
         current_ctc: fullData.current_ctc || '',
         expected_ctc: fullData.expected_ctc || '',
-        resume: fullData.resume ? `http://localhost:8000${fullData.resume}` : null,
+        resume: fullData.resume ? `${API_BASE_URL}${fullData.resume}` : null,
         skills: fullData.skills ? fullData.skills.map(s => typeof s === 'object' ? s.name : s) : [],
       };
 
@@ -454,59 +471,30 @@ Skipped: ${result.skipped.length}`;
   };
 
   const handleExportConfirm = async () => {
+    setIsLoading(true);
+    setError(null);
+
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        alert('Authentication required. Please log in again.');
-        return;
-      }
-
-      // Clean up empty filter values
-      const cleanFilters = {};
-      Object.entries(exportFilters).forEach(([key, value]) => {
-        if (value && value.trim() !== '') {
-          cleanFilters[key] = value.trim();
-        }
+      const params = new URLSearchParams(exportFilters);
+      const response = await axios.get(`${ENDPOINTS.exportCandidates}?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
       });
 
-      const queryParams = new URLSearchParams(cleanFilters).toString();
-      const response = await axios.get(
-        `http://localhost:8000/candidates/export/?${queryParams}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          responseType: 'blob',
-          timeout: 60000, // 60 second timeout for large exports
-        }
-      );
-
+      // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-
-      // Get filename from response headers if available
-      const contentDisposition = response.headers['content-disposition'];
-      const filename = contentDisposition
-        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
-        : 'candidates_export.xlsx';
-
-      link.setAttribute('download', filename);
+      link.setAttribute('download', 'candidates_export.xlsx');
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url); // Clean up
-
       setExportPopup(false);
-      setExportFilters({ role: '', experience: '', location: '' });
-      alert('Export completed successfully!');
     } catch (err) {
-      console.error('Export failed:', err);
-      const errorMessage =
-        err.response?.data?.error ||
-        err.message ||
-        'Something went wrong while exporting.';
-      alert(`Export failed: ${errorMessage}`);
+      handleApiError(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -515,15 +503,166 @@ Skipped: ${result.skipped.length}`;
     setExportFilters({ ...exportFilters, [name]: value });
   };
 
+  // Add this function to handle filter changes
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Add this function to apply filters
+  const applyFilters = (candidatesList) => {
+    return candidatesList.filter(candidate => {
+      const roleMatch = !filters.role || 
+        candidate.role?.toLowerCase().includes(filters.role.toLowerCase());
+      
+      const locationMatch = !filters.location || 
+        candidate.location?.toLowerCase().includes(filters.location.toLowerCase());
+      
+      const experienceMatch = !filters.experience || 
+        candidate.experience?.toString().includes(filters.experience);
+
+      return roleMatch && locationMatch && experienceMatch;
+    });
+  };
+
+  // Update useEffect to apply filters when candidates or filters change
+  useEffect(() => {
+    setFilteredCandidates(applyFilters(candidates));
+  }, [candidates, filters]);
+
+  // Update the filter button click handler
+  const handleFilterClick = () => {
+    setShowFilterModal(true);
+  };
+
+  // Update the export button click handler
+  const handleExportClick = () => {
+    setShowExportModal(true);
+  };
+
+  // Render filter modal
+  const renderFilterModal = () => (
+    <div className="modal-overlay" onClick={() => setShowFilterModal(false)}>
+      <div className="modal modal-export-filters" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Filter Candidates</h2>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Job Role</label>
+            <input
+              type="text"
+              name="role"
+              value={filters.role}
+              onChange={handleFilterChange}
+              placeholder="Enter job role"
+            />
+          </div>
+          <div className="form-group">
+            <label>Experience</label>
+            <input
+              type="text"
+              name="experience"
+              value={filters.experience}
+              onChange={handleFilterChange}
+              placeholder="Enter experience (e.g., 2)"
+            />
+          </div>
+          <div className="form-group">
+            <label>Location</label>
+            <input
+              type="text"
+              name="location"
+              value={filters.location}
+              onChange={handleFilterChange}
+              placeholder="Enter location"
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button 
+            className="modal-btn cancel-btn" 
+            onClick={() => {
+              setFilters({ role: '', experience: '', location: '' });
+              setShowFilterModal(false);
+            }}
+          >
+            Clear Filters
+          </button>
+          <button className="modal-btn save-btn" onClick={() => setShowFilterModal(false)}>
+            Apply Filters
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render export modal
+  const renderExportModal = () => (
+    <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
+      <div className="modal modal-export-filters" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Export Candidates</h2>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Job Role</label>
+            <input
+              type="text"
+              name="role"
+              value={exportFilters.role}
+              onChange={handleExportFilterChange}
+              placeholder="Enter job role"
+            />
+          </div>
+          <div className="form-group">
+            <label>Experience</label>
+            <input
+              type="text"
+              name="experience"
+              value={exportFilters.experience}
+              onChange={handleExportFilterChange}
+              placeholder="Enter experience (e.g., 2 years)"
+            />
+          </div>
+          <div className="form-group">
+            <label>Location</label>
+            <input
+              type="text"
+              name="location"
+              value={exportFilters.location}
+              onChange={handleExportFilterChange}
+              placeholder="Enter location"
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="modal-btn cancel-btn" onClick={() => setShowExportModal(false)}>Cancel</button>
+          <button className="modal-btn save-btn" onClick={handleExportConfirm}>Export</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Update the candidates count display
+  const renderCandidatesCount = () => (
+    <div className="header-left">
+      <h1 className="page-title">Candidates</h1>
+      <span className="candidates-count">
+            {candidates.length} total
+      </span>
+    </div>
+  );
+
   return (
     <div className="candidates-wrapper">
       <Navbar />
       <div className="candidates-container">
         <div className="candidates-header">
-          <div className="header-left">
-            <h1 className="page-title">Candidates</h1>
-            <span className="candidates-count">{filtered.length} total</span>
-          </div>
+          {renderCandidatesCount()}
           <div className="header-actions">
             <button className="btn btn-secondary" onClick={() => document.getElementById('fileInput').click()}>
               <Upload size={16} />
@@ -558,11 +697,11 @@ Skipped: ${result.skipped.length}`;
           </div>
 
           <div className="controls-right">
-            <button className="btn btn-secondary" onClick={handleExport}>
+            <button className="btn btn-secondary" onClick={handleFilterClick}>
               <Filter size={16} />
               Filters
             </button>
-            <button className="btn btn-secondary" onClick={handleExport}>
+            <button className="btn btn-secondary" onClick={handleExportClick}>
               <Download size={16} />
               Export
             </button>
@@ -599,7 +738,7 @@ Skipped: ${result.skipped.length}`;
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((candidate) => (
+                  {filteredCandidates.map((candidate) => (
                     <tr key={candidate.id} onClick={() => handleOpenEditModal(candidate.id)}>
                       <td className="name-cell">
                         <div className="candidate-info">
@@ -653,7 +792,7 @@ Skipped: ${result.skipped.length}`;
             </div>
           ) : (
             <div className="card-grid">
-              {filtered.map((candidate) => (
+              {filteredCandidates.map((candidate) => (
                 <div
                   key={candidate.id}
                   className="candidate-card"
@@ -760,15 +899,19 @@ Skipped: ${result.skipped.length}`;
                   accept=".pdf"
                   onChange={handleFileChange}
                 />
-                {selectedCandidate?.resume && typeof selectedCandidate.resume === 'string' && (
-                  <div>
-                    <label>Current Resume:</label>
-                    <iframe
-                      src={selectedCandidate.resume}
-                      width="100%"
-                      height="300px"
-                      title="Resume Preview"
-                    />
+                {selectedCandidate?.resume && (
+                  <div className="resume-preview">
+                    <p className="resume-preview-label">Current Resume:</p>
+                    <div className="resume-preview-actions">
+                      <a 
+                        href={selectedCandidate.resume} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="resume-preview-link"
+                      >
+                        View Resume
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>
@@ -817,72 +960,48 @@ Skipped: ${result.skipped.length}`;
               <p><strong>Valid Records:</strong> {importSummary.valid}</p>
               {importSummary.missing.length > 0 ? (
                 <>
-                  <p><strong>Records with Missing Data:</strong></p>
+                  <p><strong>Records with Issues:</strong></p>
                   <ul style={{ maxHeight: '200px', overflowY: 'auto' }}>
                     {importSummary.missing.map((item, index) => (
-                      <li key={index}>
-                        Row {item.row}: Missing {item.fields.join(', ')}
+                      <li key={index} className="error-item">
+                        <strong>Row {item.row}:</strong> {item.error}
                       </li>
                     ))}
                   </ul>
-                  <p><em>Records with missing required fields will be skipped.</em></p>
+                  <p className="warning-text">
+                    <em>Records with issues will be skipped during import.</em>
+                  </p>
                 </>
               ) : (
-                <p style={{ color: 'green' }}>✅ All records have required data!</p>
+                <p className="success-text">✅ All records are valid!</p>
               )}
             </div>
             <div className="modal-footer">
               <button className="modal-btn cancel-btn" onClick={() => setImportPopup(false)}>Cancel</button>
-              <button className="modal-btn save-btn" onClick={handleConfirmImport}>Confirm Import</button>
+              <button 
+                className="modal-btn save-btn" 
+                onClick={handleConfirmImport}
+                disabled={importSummary.valid === 0}
+              >
+                Confirm Import
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Export Modal */}
-      {exportPopup && (
-        <div className="modal-overlay" onClick={() => setExportPopup(false)}>
-          <div className="modal modal-export-filters" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Export Candidates</h2>
-y            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Job Role</label>
-                <input
-                  type="text"
-                  name="role"
-                  value={exportFilters.role}
-                  onChange={handleExportFilterChange}
-                  placeholder="Enter job role"
-                />
-              </div>
-              <div className="form-group">
-                <label>Experience</label>
-                <input
-                  type="text"
-                  name="experience"
-                  value={exportFilters.experience}
-                  onChange={handleExportFilterChange}
-                  placeholder="Enter experience (e.g., 2 years)"
-                />
-              </div>
-              <div className="form-group">
-                <label>Location</label>
-                <input
-                  type="text"
-                  name="location"
-                  value={exportFilters.location}
-                  onChange={handleExportFilterChange}
-                  placeholder="Enter location"
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="modal-btn cancel-btn" onClick={() => setExportPopup(false)}>Cancel</button>
-              <button className="modal-btn save-btn" onClick={handleExportConfirm}>Export</button>
-            </div>
-          </div>
+      {/* Modals */}
+      {showFilterModal && renderFilterModal()}
+      {showExportModal && renderExportModal()}
+
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
+      {isLoading && (
+        <div className="loading-overlay">
+          <div className="loading-spinner"></div>
         </div>
       )}
     </div>

@@ -10,10 +10,13 @@ export default function Signup() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
 
   const navigate = useNavigate();
@@ -47,12 +50,32 @@ export default function Signup() {
 
   const handleSignup = async (e) => {
     e.preventDefault();
+    setErrorMsg('');
+
+    // Password validation
+    if (password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMsg('Passwords do not match');
+      return;
+    }
+
     try {
-      await axios.post('http://localhost:8000/signup/', { name: username, email, password });
-      setShowVerificationModal(true);
-      setResendTimer(60);
+      const response = await axios.post('http://localhost:8000/signup/', { 
+        name: username, 
+        email, 
+        password 
+      });
+      
+      if (response.data.message === 'User created successfully. Please check your email to verify your account.') {
+        setShowVerificationModal(true);
+        setResendTimer(60);
+      }
     } catch (error) {
-      alert(error.response?.data?.error || 'Signup failed. Try again.');
+      setErrorMsg(error.response?.data?.error || 'Signup failed. Try again.');
     }
   };
 
@@ -64,24 +87,52 @@ export default function Signup() {
   const handleVerify = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:8000/verify-email/', { email, code: verificationCode });
-      localStorage.setItem('token', response.data.access);
-      alert('Email verified successfully!');
-      setShowVerificationModal(false);
-      navigate('/dashboard');
+      const response = await axios.post('http://localhost:8000/verify-email/', { 
+        email, 
+        code: verificationCode 
+      });
+      
+      if (response.data.access) {
+        localStorage.setItem('token', response.data.access);
+        alert('Email verified successfully!');
+        setShowVerificationModal(false);
+        navigate('/dashboard');
+      }
     } catch (error) {
-      alert(error.response?.data?.error || 'Verification failed.');
+      setErrorMsg(error.response?.data?.error || 'Verification failed.');
     }
   };
 
   const handleResend = async () => {
+    if (resendTimer > 0) return;
+    
     try {
       await axios.post('http://localhost:8000/resend-verification/', { email });
       setResendTimer(60);
       alert('Verification code resent!');
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to resend code.');
+      setErrorMsg(error.response?.data?.error || 'Failed to resend code.');
     }
+  };
+
+  const handleInputChange = (e) => {
+    if (e.target.name === 'password') {
+      setPassword(e.target.value);
+    } else if (e.target.name === 'confirmPassword') {
+      setConfirmPassword(e.target.value);
+    } else if (e.target.name === 'email') {
+      setEmail(e.target.value);
+    } else if (e.target.name === 'username') {
+      setUsername(e.target.value);
+    }
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword(!showConfirmPassword);
   };
 
   return (
@@ -106,17 +157,89 @@ export default function Signup() {
             {!isLogin && (
               <div className="form-group">
                 <label>Full Name</label>
-                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Jane Smith" required />
+                <input 
+                  type="text" 
+                  name="username"
+                  value={username} 
+                  onChange={(e) => setUsername(e.target.value)} 
+                  placeholder="Jane Smith" 
+                  required 
+                />
               </div>
             )}
             <div className="form-group">
               <label>Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" required />
+              <input 
+                type="email" 
+                name="email"
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                placeholder="your@email.com" 
+                required 
+              />
             </div>
             <div className="form-group">
               <label>Password</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+              <div className="password-input-container">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={togglePasswordVisibility}
+                >
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
+            {!isLogin && (
+              <div className="form-group">
+                <label>Confirm Password</label>
+                <div className="password-input-container">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={toggleConfirmPasswordVisibility}
+                  >
+                    {showConfirmPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
             <button type="submit" className="auth-button">{isLogin ? 'Sign In' : 'Create Account'}</button>
           </form>
           {isLogin && (
@@ -127,6 +250,37 @@ export default function Signup() {
         </div>
         
       </div>
+
+      {/* Verification Modal */}
+      {showVerificationModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>Verify Your Email</h3>
+            <p>Please enter the verification code sent to your email address.</p>
+            <form onSubmit={handleVerify}>
+              <div className="form-group">
+                <input
+                  type="text"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  placeholder="Enter verification code"
+                  required
+                />
+              </div>
+              <button type="submit" className="auth-button">Verify Email</button>
+              <button
+                type="button"
+                className="auth-button"
+                onClick={handleResend}
+                disabled={resendTimer > 0}
+                style={{ marginTop: '10px', opacity: resendTimer > 0 ? 0.7 : 1 }}
+              >
+                {resendTimer > 0 ? `Resend Code (${resendTimer}s)` : 'Resend Code'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }

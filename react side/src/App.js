@@ -43,19 +43,19 @@ function App() {
       {/* Features */}
       <section className="landing-features">
         <div className="landing-feature">
+          <FontAwesomeIcon icon={faUsers} className="landing-feature-icon" />
+          <h3>Talent Management</h3>
+          <p>Efficiently manage your talent pool with smart organization tools. Track candidates, their skills, and status in one centralized platform.</p>
+        </div>
+        <div className="landing-feature">
           <FontAwesomeIcon icon={faSearch} className="landing-feature-icon" />
-          <h3>Lightning Search</h3>
-          <p>Find the perfect candidate in seconds with smart filters and instant search. Your talent pool becomes your superpower.</p>
+          <h3>Smart Search</h3>
+          <p>Find the perfect candidate instantly with our advanced search filters. Search by skills, experience, location, and more.</p>
         </div>
         <div className="landing-feature">
           <FontAwesomeIcon icon={faChartBar} className="landing-feature-icon" />
-          <h3>Analytics</h3>
-          <p>Generate analytics candidate profiles to share with clients. Professional presentations made effortless.</p>
-        </div>
-        <div className="landing-feature">
-          <FontAwesomeIcon icon={faBoxes} className="landing-feature-icon" />
-          <h3>Bulk Everything</h3>
-          <p>Import hundreds of candidates in seconds. Export filtered lists instantly. Scale your recruiting without the headache.</p>
+          <h3>Analytics Dashboard</h3>
+          <p>Get insights into your recruiting process with detailed analytics. Track hiring metrics, candidate sources, and team performance.</p>
         </div>
       </section>
 
@@ -63,7 +63,7 @@ function App() {
       <section className="landing-trusted">
         <p className="landing-trust-line">Trusted by recruiting rockstars worldwide</p>
         <div className="landing-partners">
-          <span>RecruiterPro</span>
+          <span>Offrolls</span>
           <span>TalentFinder</span>
           <span>HireGenius</span>
           <span>StaffMaster</span>

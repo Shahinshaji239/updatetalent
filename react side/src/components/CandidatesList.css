@@ -430,27 +430,67 @@ body {
   margin-bottom: 8px;
 }
 
+/* Standardized Input Styles */
 .form-group input,
 .form-group select,
-.form-group textarea {
+.form-group textarea,
+.search-input,
+.modal input,
+.modal select,
+.modal textarea {
   width: 100%;
-  padding: 10px;
+  padding: 10px 12px;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   font-size: 14px;
-  border: var(--text-primary);
+  color: var(--text-primary);
+  background-color: var(--background-white);
+  transition: all 0.2s ease;
 }
 
 .form-group input:focus,
 .form-group select:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.search-input:focus,
+.modal input:focus,
+.modal select:focus,
+.modal textarea:focus {
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
 }
 
-.form-group textarea {
-  resize: vertical;
+.form-group input::placeholder,
+.form-group select::placeholder,
+.form-group textarea::placeholder,
+.search-input::placeholder,
+.modal input::placeholder,
+.modal select::placeholder,
+.modal textarea::placeholder {
+  color: var(--text-secondary);
+}
+
+/* Remove default select styling */
+.form-group select,
+.modal select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 36px;
+}
+
+/* Style for disabled inputs */
+.form-group input:disabled,
+.form-group select:disabled,
+.form-group textarea:disabled,
+.modal input:disabled,
+.modal select:disabled,
+.modal textarea:disabled {
+  background-color: var(--background-light);
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .modal-footer {
@@ -625,4 +665,71 @@ body {
     padding: 8px 12px;
     font-size: 12px;
   }
+}
+
+.error-item {
+  color: #dc3545;
+  margin-bottom: 8px;
+  font-size: 0.9em;
+}
+
+.warning-text {
+  color: #856404;
+  background-color: #fff3cd;
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: 12px;
+}
+
+.success-text {
+  color: #155724;
+  background-color: #d4edda;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.modal-import-summary .modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.modal-import-summary .modal-footer button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.resume-preview {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: var(--background-light);
+  border-radius: var(--border-radius);
+}
+
+.resume-preview-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.resume-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.resume-preview-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: var(--primary-color);
+  color: white;
+  text-decoration: none;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.resume-preview-link:hover {
+  background-color: #1f2937;
 }

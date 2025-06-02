@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { User } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUsers } from '@fortawesome/free-solid-svg-icons';
 import './Navbar.css';
 import axios from 'axios';
 
@@ -67,10 +69,10 @@ const Navbar = () => {
     <>
       <nav className="talent-navbar">
         <div className="talent-navbar-left">
-          <div className="talent-logo-box">
-            <User className="talent-logo-icon" />
+          <div className="landing-logo">
+            <FontAwesomeIcon icon={faUsers} className="landing-logo-icon" />
+            <span className="landing-logo-text">TalentStack</span>
           </div>
-          <span className="talent-brand-text">TalentStack</span>
         </div>
 
         <div className="talent-navbar-center">

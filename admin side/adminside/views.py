@@ -148,9 +148,21 @@ def signup(request):
     user.save()
 
     send_mail(
-        'Verify Your Email',
-        f'Your verification code is {verification_code}',
-        'from@example.com',  # Replace with your actual sender email
+        'Welcome to TalentStack - Verify Your Email',
+        f"""
+        Hi {name},
+
+        Welcome to TalentStack!
+
+        Here is your 6-digit email verification code:
+        🔐  {verification_code}
+
+        Please enter this code in the app to activate your account.
+
+        Thanks,  
+        Team TalentStack
+        """,
+        'TalentStack <shahinshaji239@gmail.com>',  # Using the same verified sender as password reset
         [email],
         fail_silently=False,
     )
@@ -365,7 +377,7 @@ def safe_string(value):
     return str(value).strip()
 
 def validate_email_format(email):
-    """Validate email format"""
+    """Validate email format using Django's built-in validator"""
     try:
         validate_email(email)
         return True
@@ -379,6 +391,8 @@ def validate_email_format(email):
 @parser_classes([MultiPartParser])
 def bulk_import_excel(request):
     excel_file = request.FILES.get('file')
+    resume_files = request.FILES.getlist('resumes')  # Get list of resume files
+    
     if not excel_file:
         return Response({'error': 'No file uploaded.'}, status=400)
 
@@ -391,6 +405,15 @@ def bulk_import_excel(request):
 
         if df.empty:
             return Response({'error': 'Uploaded Excel file is empty.'}, status=400)
+
+        # Create a mapping of email to resume file if resumes are provided
+        resume_map = {}
+        if resume_files:
+            for resume in resume_files:
+                # Assuming resume filename contains email or some identifier
+                # You might need to adjust this based on your file naming convention
+                email = resume.name.split('_')[0]  # Adjust this based on your naming convention
+                resume_map[email] = resume
 
         # Standardize column names (match frontend exactly)
         df.columns = (df.columns.str.lower()
@@ -447,28 +470,22 @@ def bulk_import_excel(request):
 
                 # Convert and validate numeric fields safely
                 try:
-                    experience_val = row.get('experience', 0)
-                    experience = int(pd.to_numeric(experience_val, errors='coerce')) if pd.notna(experience_val) else 0
-                    if experience < 0:
-                        experience = 0
+                    experience_val = row.get('experience', '0')
+                    experience = str(int(pd.to_numeric(experience_val, errors='coerce'))) if pd.notna(experience_val) else '0'
                 except:
-                    experience = 0
+                    experience = '0'
 
                 try:
-                    current_ctc_val = row.get('currentctc', 0)  # Note: standardized column name
-                    current_ctc = float(pd.to_numeric(current_ctc_val, errors='coerce')) if pd.notna(current_ctc_val) else 0.0
-                    if current_ctc < 0:
-                        current_ctc = 0.0
+                    current_ctc_val = row.get('currentctc', '0')
+                    current_ctc = str(float(pd.to_numeric(current_ctc_val, errors='coerce'))) if pd.notna(current_ctc_val) else '0'
                 except:
-                    current_ctc = 0.0
+                    current_ctc = '0'
 
                 try:
-                    expected_ctc_val = row.get('expectedctc', 0)  # Note: standardized column name
-                    expected_ctc = float(pd.to_numeric(expected_ctc_val, errors='coerce')) if pd.notna(expected_ctc_val) else 0.0
-                    if expected_ctc < 0:
-                        expected_ctc = 0.0
+                    expected_ctc_val = row.get('expectedctc', '0')
+                    expected_ctc = str(float(pd.to_numeric(expected_ctc_val, errors='coerce'))) if pd.notna(expected_ctc_val) else '0'
                 except:
-                    expected_ctc = 0.0
+                    expected_ctc = '0'
 
                 candidate_data = {
                     'name': name,
@@ -485,6 +502,10 @@ def bulk_import_excel(request):
                 }
 
                 try:
+                    # Check if resume exists for this email
+                    if email in resume_map:
+                        candidate_data['resume'] = resume_map[email]
+
                     candidate, created = Candidate.objects.update_or_create(
                         email=candidate_data['email'],
                         defaults=candidate_data

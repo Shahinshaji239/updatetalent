@@ -13,6 +13,24 @@
   gap: 12px;
 }
 
+/* Logo styles from App.css */
+.landing-logo {
+  display: flex;
+  align-items: center;
+}
+
+.landing-logo-icon {
+  margin-right: 10px;
+  font-size: 24px;
+  color: #000;
+}
+
+.landing-logo-text {
+  font-size: 20px;
+  font-weight: 600;
+  color: #000;
+}
+
 .talent-logo-box {
   display: flex;
   align-items: center;
