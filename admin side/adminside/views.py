@@ -40,13 +40,6 @@ import re
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
-
-
-
-
-# adminside/views.py
-
-
 User = get_user_model()
 
 @csrf_protect
@@ -58,7 +51,7 @@ def login(request):
 
         if user is not None and user.is_superuser:
             auth_login(request, user)
-            return redirect('dashboard')  # Make sure your URL name is correct
+            return redirect('dashboard')
         else:
             return render(request, 'login.html', {'error': 'Invalid credentials or not authorized.'})
 
@@ -88,7 +81,6 @@ def admin_dashboard(request):
             Q(email__icontains=search_query)
         )
 
-    # Annotate recruiter with candidate count
     recruiters = recruiters.annotate(candidate_count=Count('candidates'))
 
     paginator = Paginator(recruiters, 5)
@@ -109,24 +101,13 @@ def toggle_user_block(request, user_id):
     user.save()
     return redirect('dashboard')   
 
-#@csrf_exempt
-#@api_view(['POST'])
-#@permission_classes([IsAuthenticated])       
-#def admin_logout(request):
-#    try:
-#        request.user.auth_token.delete()
-#        return Response({'message': 'Logged out successfully'}, status=HTTP_200_OK)
-#    except Exception as e:
-#       return Response({'error': 'Something went wrong while logging out.'}, status=HTTP_400_BAD_REQUEST)
-
-
 @csrf_protect
 @login_required
 def admin_logout(request):
     django_logout(request)
     return redirect('login')
 
-#api view
+# API Views
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -162,7 +143,7 @@ def signup(request):
         Thanks,  
         Team TalentStack
         """,
-        'TalentStack <shahinshaji239@gmail.com>',  # Using the same verified sender as password reset
+        'TalentStack <shahinshaji239@gmail.com>',
         [email],
         fail_silently=False,
     )
@@ -196,11 +177,11 @@ def add_candidate(request):
         role = request.data.get('role')
         location = request.data.get('location')
         experience = request.data.get('experience')
-        skills = request.data.get('skills')  # Expecting comma-separated string
+        skills = request.data.get('skills')
         industry = request.data.get('industry')
         gender = request.data.get('gender')
-        current_ctc = request.data.get('current_ctc')
-        expected_ctc = request.data.get('expected_ctc')
+        current_ctc = request.data.get('current_ctc', '')
+        expected_ctc = request.data.get('expected_ctc', '')
         notes = request.data.get('notes')
         resume = request.FILES.get('resume')
 
@@ -216,8 +197,8 @@ def add_candidate(request):
             experience=experience,
             industry=industry,
             gender=gender,
-            current_ctc=current_ctc,
-            expected_ctc=expected_ctc,
+            current_ctc=current_ctc if current_ctc else '',
+            expected_ctc=expected_ctc if expected_ctc else '',
             notes=notes,
             resume=resume
         )
@@ -254,14 +235,12 @@ def get_candidate_detail(request, candidate_id):
     serializer = CandidateSerializer(candidate)
     return Response(serializer.data, status=200)
 
-
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_candidate(request, candidate_id):
     user = request.user
 
     try:
-        # Get the candidate object linked to this recruiter (user)
         candidate = Candidate.objects.get(id=candidate_id, recruiter=user)
         candidate.delete()
         return Response({"message": "Candidate deleted successfully."}, status=HTTP_200_OK)
@@ -277,24 +256,46 @@ def update_candidate(request, candidate_id):
     except Candidate.DoesNotExist:
         return Response({"error": "Candidate not found."}, status=HTTP_404_NOT_FOUND)
 
-    # Handle files in request.FILES
+    # Handle file uploads
     if 'resume' in request.FILES:
-        resume_file = request.FILES['resume']
-        # Handle file saving or updating here
-        candidate.resume = resume_file
-        candidate.save()
+        candidate.resume = request.FILES['resume']
 
-    # Handle other fields
-    serializer = CandidateSerializer(candidate, data=request.data, partial=True)
+    # Handle other fields with proper CTC handling
+    candidate.name = request.data.get('name', candidate.name)
+    candidate.email = request.data.get('email', candidate.email)
+    candidate.role = request.data.get('role', candidate.role)
+    candidate.location = request.data.get('location', candidate.location)
+    candidate.experience = request.data.get('experience', candidate.experience)
+    candidate.industry = request.data.get('industry', candidate.industry)
+    candidate.gender = request.data.get('gender', candidate.gender)
+    candidate.notes = request.data.get('notes', candidate.notes)
     
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=HTTP_200_OK)
-    else:
-        return Response(serializer.errors, status=HTTP_400_BAD_REQUEST)
+    # Fixed CTC handling - don't convert empty strings to '0'
+    current_ctc = request.data.get('current_ctc', '')
+    expected_ctc = request.data.get('expected_ctc', '')
+    candidate.current_ctc = current_ctc if current_ctc and current_ctc.strip() else ''
+    candidate.expected_ctc = expected_ctc if expected_ctc and expected_ctc.strip() else ''
 
+    # Handle skills
+    skills_data = request.data.get('skills', '')
+    if skills_data:
+        candidate.skills.clear()
+        if isinstance(skills_data, str):
+            skill_names = [s.strip() for s in skills_data.split(',')]
+        else:
+            skill_names = skills_data
+        
+        for skill_name in skill_names:
+            if skill_name.strip():
+                skill_obj, created = Skill.objects.get_or_create(name=skill_name.strip())
+                candidate.skills.add(skill_obj)
 
+    candidate.save()
+    
+    serializer = CandidateSerializer(candidate)
+    return Response(serializer.data, status=HTTP_200_OK)
 
+# Fixed search functionality
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def search_candidates(request):
@@ -302,61 +303,54 @@ def search_candidates(request):
     query = request.GET.get('q', '')
     location = request.GET.get('location', '')
     role = request.GET.get('role', '')
-    skill = request.GET.get('skills', '')
+    skills = request.GET.get('skills', '')
 
     candidates = Candidate.objects.filter(recruiter=recruiter)
 
+    # Apply text search across multiple fields
     if query:
         candidates = candidates.filter(
-            Q(name__icontains=query) | Q(email__icontains=query) | Q(role__icontains=query)
+            Q(name__icontains=query) | 
+            Q(email__icontains=query) | 
+            Q(role__icontains=query) |
+            Q(location__icontains=query) |
+            Q(skills__name__icontains=query) |
+            Q(industry__icontains=query) |
+            Q(notes__icontains=query)
         )
 
+    # Apply specific filters
     if location:
         candidates = candidates.filter(location__icontains=location)
 
     if role:
         candidates = candidates.filter(role__icontains=role)
 
-    if skill:
-        candidates = candidates.filter(skills__name__icontains=skill)
+    if skills:
+        candidates = candidates.filter(skills__name__icontains=skills)
 
-    candidates = candidates.distinct()
-
+    candidates = candidates.distinct().order_by('-created_at')
     serializer = CandidateSerializer(candidates, many=True)
     return Response(serializer.data, status=HTTP_200_OK)
 
 @csrf_exempt
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])  # Use JWT authentication
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def logout(request):
     try:
-        # Get the refresh token from request data
         refresh_token = request.data.get('refresh_token')
         
         if refresh_token:
-            # Blacklist the refresh token
             token = RefreshToken(refresh_token)
             token.blacklist()
             return Response({'message': 'Logged out successfully'}, status=HTTP_200_OK)
         else:
-            # If no refresh token provided, just return success
-            # (Access token will expire naturally)
             return Response({'message': 'Logged out successfully'}, status=HTTP_200_OK)
             
     except Exception as e:
         return Response({'message': 'Logged out successfully'}, status=HTTP_200_OK)
 
-@csrf_exempt
-@api_view(['POST'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
-def simple_logout(request):
-    """
-    Simple logout that doesn't require refresh token
-    Just validates that user is authenticated and returns success
-    """
-    return Response({'message': 'Logged out successfully'}, status=HTTP_200_OK)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_profile(request):
@@ -368,8 +362,7 @@ def get_user_profile(request):
         "is_admin": user.is_admin,
     }, status=HTTP_200_OK)
 
-
-# In your views.py, specifically in bulk_import_excel function
+# Enhanced bulk import with better handling
 def safe_string(value):
     """Safely convert value to string, handling NaN and None"""
     if pd.isna(value) or value is None:
@@ -384,19 +377,16 @@ def validate_email_format(email):
     except ValidationError:
         return False
 
-
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser])
 def bulk_import_excel(request):
     excel_file = request.FILES.get('file')
-    resume_files = request.FILES.getlist('resumes')  # Get list of resume files
+    resume_files = request.FILES.getlist('resumes')
     
     if not excel_file:
         return Response({'error': 'No file uploaded.'}, status=400)
 
-    # File size validation (10MB limit)
     if excel_file.size > 10 * 1024 * 1024:
         return Response({'error': 'File size too large. Maximum 10MB allowed.'}, status=400)
 
@@ -406,26 +396,24 @@ def bulk_import_excel(request):
         if df.empty:
             return Response({'error': 'Uploaded Excel file is empty.'}, status=400)
 
-        # Create a mapping of email to resume file if resumes are provided
+        # Create resume mapping
         resume_map = {}
         if resume_files:
             for resume in resume_files:
-                # Assuming resume filename contains email or some identifier
-                # You might need to adjust this based on your file naming convention
-                email = resume.name.split('_')[0]  # Adjust this based on your naming convention
+                email = resume.name.split('_')[0]
                 resume_map[email] = resume
 
-        # Standardize column names (match frontend exactly)
+        # Get original columns before standardization
+        original_columns = list(df.columns)
+
+        # Standardize column names
         df.columns = (df.columns.str.lower()
                      .str.replace(r'\s+', '', regex=True)
                      .str.replace(r'[^a-z0-9]', '', regex=True))
         
         print("Standardized DataFrame columns:", df.columns.tolist())
-        print("Sample data:", df.iloc[0].to_dict() if not df.empty else "No data")
 
         required_fields = ['name', 'email']
-        
-        # Check if required columns exist
         missing_columns = [field for field in required_fields if field not in df.columns]
         if missing_columns:
             return Response({
@@ -439,28 +427,25 @@ def bulk_import_excel(request):
 
         with transaction.atomic():
             for index, row in df.iterrows():
-                row_number = index + 2  # Excel row number (accounting for header)
+                row_number = index + 2
 
-                # Safely extract and validate required fields
                 name = safe_string(row.get('name'))
                 email = safe_string(row.get('email'))
 
-                # Enhanced validation
                 if not name or name.lower() in ['nan', 'null', 'none']:
                     skipped_rows.append({
                         'row': row_number, 
-                        'error': f'Missing or invalid Name (got: "{row.get("name")}")'
+                        'error': f'Missing or invalid Name'
                     })
                     continue
                     
                 if not email or email.lower() in ['nan', 'null', 'none']:
                     skipped_rows.append({
                         'row': row_number, 
-                        'error': f'Missing or invalid Email (got: "{row.get("email")}")'
+                        'error': f'Missing or invalid Email'
                     })
                     continue
 
-                # Email format validation
                 if not validate_email_format(email):
                     skipped_rows.append({
                         'row': row_number, 
@@ -468,41 +453,29 @@ def bulk_import_excel(request):
                     })
                     continue
 
-                # Convert and validate numeric fields safely
-                try:
-                    experience_val = row.get('experience', '0')
-                    experience = str(int(pd.to_numeric(experience_val, errors='coerce'))) if pd.notna(experience_val) else '0'
-                except:
-                    experience = '0'
-
-                try:
-                    current_ctc_val = row.get('currentctc', '0')
-                    current_ctc = str(float(pd.to_numeric(current_ctc_val, errors='coerce'))) if pd.notna(current_ctc_val) else '0'
-                except:
-                    current_ctc = '0'
-
-                try:
-                    expected_ctc_val = row.get('expectedctc', '0')
-                    expected_ctc = str(float(pd.to_numeric(expected_ctc_val, errors='coerce'))) if pd.notna(expected_ctc_val) else '0'
-                except:
-                    expected_ctc = '0'
+                # Handle CTC fields properly - avoid converting empty to '0'
+                current_ctc_val = safe_string(row.get('currentctc', ''))
+                expected_ctc_val = safe_string(row.get('expectedctc', ''))
+                
+                # Only convert to string if there's actual data
+                current_ctc = current_ctc_val if current_ctc_val and current_ctc_val not in ['0', '0.0', 'nan'] else ''
+                expected_ctc = expected_ctc_val if expected_ctc_val and expected_ctc_val not in ['0', '0.0', 'nan'] else ''
 
                 candidate_data = {
                     'name': name,
                     'email': email,
-                    'role': safe_string(row.get('role')),
-                    'location': safe_string(row.get('location')),
-                    'experience': experience,
-                    'industry': safe_string(row.get('industry')),
-                    'gender': safe_string(row.get('gender')),
+                    'role': safe_string(row.get('role', '')),
+                    'location': safe_string(row.get('location', '')),
+                    'experience': safe_string(row.get('experience', '')),
+                    'industry': safe_string(row.get('industry', '')),
+                    'gender': safe_string(row.get('gender', '')),
                     'current_ctc': current_ctc,
                     'expected_ctc': expected_ctc,
-                    'notes': safe_string(row.get('notes')),
+                    'notes': safe_string(row.get('notes', '')),
                     'recruiter': request.user
                 }
 
                 try:
-                    # Check if resume exists for this email
                     if email in resume_map:
                         candidate_data['resume'] = resume_map[email]
 
@@ -511,13 +484,13 @@ def bulk_import_excel(request):
                         defaults=candidate_data
                     )
 
-                    # Handle many-to-many Skills
-                    skills_str = safe_string(row.get('skills'))
+                    # Handle skills
+                    skills_str = safe_string(row.get('skills', ''))
                     if skills_str:
                         skill_names = [s.strip() for s in skills_str.split(',') if s.strip()]
                         skill_objs = []
                         for skill_name in skill_names:
-                            if skill_name:  # Additional check
+                            if skill_name:
                                 skill_obj, _ = Skill.objects.get_or_create(name=skill_name)
                                 skill_objs.append(skill_obj)
                         candidate.skills.set(skill_objs)
@@ -562,24 +535,19 @@ def export_candidates_excel(request):
     export_format = request.GET.get('format', 'excel')
 
     try:
-        # Base queryset
         candidates = Candidate.objects.filter(recruiter=user)
 
-        # Optional filters with proper data type handling
         if role:
             candidates = candidates.filter(role__icontains=role)
         if location:
             candidates = candidates.filter(location__icontains=location)
         if experience:
             try:
-                # FIXED: Proper integer filtering
                 experience_int = int(experience)
                 candidates = candidates.filter(experience=experience_int)
             except ValueError:
-                # If not a valid integer, try partial match on string representation
                 candidates = candidates.filter(experience__icontains=experience)
 
-        # Prepare data
         data = []
         for c in candidates:
             data.append({
@@ -588,12 +556,12 @@ def export_candidates_excel(request):
                 'Role': c.role,
                 'Location': c.location,
                 'Experience': c.experience,
-                'Industry': c.industry,
-                'Gender': c.gender,
-                'Current CTC': c.current_ctc,
-                'Expected CTC': c.expected_ctc,
+                'Industry': c.industry or '',
+                'Gender': c.gender or '',
+                'Current CTC': c.current_ctc or '',
+                'Expected CTC': c.expected_ctc or '',
                 'Skills': ', '.join([s.name for s in c.skills.all()]),
-                'Notes': c.notes,
+                'Notes': c.notes or '',
             })
 
         if not data:
@@ -651,7 +619,6 @@ def verify_email(request):
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def resend_verification_code(request):
@@ -686,34 +653,32 @@ def resend_verification_code(request):
             Thanks,  
             Team TalentStack
             """,
-    'TalentStack <shahinshaji239@gmail.com>',  # Your verified Gmail
+    'TalentStack <shahinshaji239@gmail.com>',
     [email],
     fail_silently=False,
 )
 
-
         return Response({'message': 'Verification code resent'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def request_password_reset(request):
     email = request.data.get('email')
     if not email:
-        return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST) # Use status constants
+        return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         user = User.objects.get(email=email)
-        # Generate a new unique reset code
         reset_code = str(random.randint(100000, 999999))
-        user.reset_code = reset_code # Ensure your User model has a 'reset_code' field
+        user.reset_code = reset_code
         user.save()
 
-        # Send the reset email
         send_mail(
             'Reset Your TalentStack Password',
             f"Hi {user.name if hasattr(user, 'name') else user.email},\n\nHere is your 6-digit password reset code:\n🔐 {reset_code}\n\nEnter this code in the app to reset your password.\n\nThanks, \nTeam TalentStack",
-            'TalentStack <shahinshaji239@gmail.com>',  # Replace with your verified sender
+            'TalentStack <shahinshaji239@gmail.com>',
             [email],
             fail_silently=False,
         )
@@ -721,10 +686,11 @@ def request_password_reset(request):
         return Response({'message': 'Reset code sent to your email'}, status=status.HTTP_200_OK)
 
     except User.DoesNotExist:
-        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND) # Use status constants
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def confirm_password_reset(request): # New view function
+def confirm_password_reset(request):
     reset_code = request.data.get('reset_code')
     new_password = request.data.get('new_password')
 
@@ -733,12 +699,11 @@ def confirm_password_reset(request): # New view function
 
     try:
         user = User.objects.get(reset_code=reset_code)
-        user.set_password(new_password) # Use set_password to correctly hash the password
-        user.reset_code = None # Invalidate the used reset code
+        user.set_password(new_password)
+        user.reset_code = None
         user.save()
         return Response({'message': 'Password reset successfully'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'Invalid or expired reset code'}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, LayoutGrid, List, Filter, Download, Upload } from 'lucide-react';
+import { Plus, Search, LayoutGrid, List, Filter, Download, Upload, X } from 'lucide-react';
 import Navbar from './Navbar';
 import * as XLSX from 'xlsx';
 import './CandidatesList.css';
@@ -14,9 +14,9 @@ const ENDPOINTS = {
   addCandidate: `${API_BASE_URL}/add-candidate/`,
   updateCandidate: (id) => `${API_BASE_URL}/update_candidate/${id}/`,
   deleteCandidate: (id) => `${API_BASE_URL}/candidates/${id}/delete/`,
-  searchCandidates: `${API_BASE_URL}/search-candidates/`,
+  searchCandidates: `${API_BASE_URL}/candidates/search/`,
   bulkImport: `${API_BASE_URL}/bulk-import-excel/`,
-  exportCandidates: `${API_BASE_URL}/export-candidates-excel/`
+  exportCandidates: `${API_BASE_URL}/candidates/export/`
 };
 
 const CandidatesList = () => {
@@ -24,6 +24,7 @@ const CandidatesList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [view, setView] = useState('table');
   const [candidates, setCandidates] = useState([]);
+  const [filteredCandidates, setFilteredCandidates] = useState([]);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [newCandidate, setNewCandidate] = useState({
     name: '', email: '', role: '', location: '', experience: '',
@@ -32,7 +33,7 @@ const CandidatesList = () => {
   });
   const [importPopup, setImportPopup] = useState(false);
   const [importData, setImportData] = useState(null);
-  const [importSummary, setImportSummary] = useState({ total: 0, missing: [], valid: 0 });
+  const [importSummary, setImportSummary] = useState({ total: 0, missing: [], valid: 0, extraColumns: [] });
   const [exportPopup, setExportPopup] = useState(false);
   const [exportFilters, setExportFilters] = useState({ role: '', experience: '', location: '' });
   const [selectedImportFile, setSelectedImportFile] = useState(null);
@@ -42,10 +43,10 @@ const CandidatesList = () => {
   const [filters, setFilters] = useState({
     role: '',
     experience: '',
-    location: ''
+    location: '',
+    skills: ''
   });
-  const [filteredCandidates, setFilteredCandidates] = useState([]);
-  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
 
   const location = useLocation();
@@ -59,7 +60,7 @@ const CandidatesList = () => {
       window.location.href = '/';
     } else {
       setError(error.response?.data?.error || 'An error occurred');
-      setTimeout(() => setError(null), 5000); // Clear error after 5 seconds
+      setTimeout(() => setError(null), 5000);
     }
   };
 
@@ -72,7 +73,6 @@ const CandidatesList = () => {
     if (!candidate.location) errors.push('Location is required');
     if (!candidate.experience) errors.push('Experience is required');
     
-    // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (candidate.email && !emailRegex.test(candidate.email)) {
       errors.push('Invalid email format');
@@ -104,11 +104,75 @@ const CandidatesList = () => {
 
   useEffect(() => {
     fetchCandidates();
-
     if (location.state?.triggerImport) {
       document.getElementById('fileInput')?.click();
     }
   }, []);
+
+  // Fixed search functionality
+  const handleSearch = async (query) => {
+    setSearchTerm(query);
+    
+    if (!query.trim()) {
+      applyFilters(candidates);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams({
+        q: query,
+        location: filters.location || '',
+        role: filters.role || '',
+        skills: filters.skills || ''
+      });
+
+      const response = await axios.get(`${ENDPOINTS.searchCandidates}?${params}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setFilteredCandidates(response.data);
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Apply filters to candidate list
+  const applyFilters = (candidatesList) => {
+    let filtered = candidatesList.filter(candidate => {
+      const roleMatch = !filters.role || 
+        candidate.role?.toLowerCase().includes(filters.role.toLowerCase());
+      
+      const locationMatch = !filters.location || 
+        candidate.location?.toLowerCase().includes(filters.location.toLowerCase());
+      
+      const experienceMatch = !filters.experience || 
+        candidate.experience?.toString().includes(filters.experience);
+
+      const skillsMatch = !filters.skills || 
+        (candidate.skills && candidate.skills.some(skill => 
+          (typeof skill === 'object' ? skill.name : skill)
+            .toLowerCase().includes(filters.skills.toLowerCase())
+        ));
+
+      return roleMatch && locationMatch && experienceMatch && skillsMatch;
+    });
+
+    setFilteredCandidates(filtered);
+  };
+
+  useEffect(() => {
+    if (searchTerm) {
+      handleSearch(searchTerm);
+    } else {
+      applyFilters(candidates);
+    }
+  }, [candidates, filters]);
 
   const openModal = () => {
     setSelectedCandidate(null);
@@ -156,32 +220,33 @@ const CandidatesList = () => {
     { value: 'Node.js', label: 'Node.js' },
     { value: 'JavaScript', label: 'JavaScript' },
     { value: 'TypeScript', label: 'TypeScript' },
+    { value: 'Python', label: 'Python' },
+    { value: 'Java', label: 'Java' },
+    { value: 'C++', label: 'C++' },
+    { value: 'PHP', label: 'PHP' },
+    { value: 'Angular', label: 'Angular' },
+    { value: 'Vue.js', label: 'Vue.js' },
+    { value: 'Django', label: 'Django' },
+    { value: 'Flask', label: 'Flask' },
+    { value: 'MySQL', label: 'MySQL' },
+    { value: 'PostgreSQL', label: 'PostgreSQL' },
+    { value: 'MongoDB', label: 'MongoDB' },
+    { value: 'AWS', label: 'AWS' },
+    { value: 'Azure', label: 'Azure' },
+    { value: 'Docker', label: 'Docker' },
+    { value: 'Kubernetes', label: 'Kubernetes' },
+    { value: 'Git', label: 'Git' },
     { value: 'Figma', label: 'Figma' },
+    { value: 'Photoshop', label: 'Photoshop' },
     { value: 'Strategy', label: 'Strategy' },
     { value: 'Analytics', label: 'Analytics' },
     { value: 'Agile', label: 'Agile' },
     { value: 'Research', label: 'Research' },
     { value: 'Prototyping', label: 'Prototyping' },
+    { value: 'UI/UX Design', label: 'UI/UX Design' },
+    { value: 'Project Management', label: 'Project Management' },
+    { value: 'Digital Marketing', label: 'Digital Marketing' },
   ];
-
-  const handleSearch = async (e) => {
-    const query = e.target.value;
-    setSearchTerm(query);
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${ENDPOINTS.searchCandidates}?q=${query}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setCandidates(response.data);
-    } catch (err) {
-      handleApiError(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleAddCandidate = async () => {
     const validationErrors = validateCandidate(newCandidate);
@@ -242,7 +307,7 @@ const CandidatesList = () => {
           formData.append(key, selectedCandidate[key].join(','));
         } else if (key === 'resume' && selectedCandidate[key] instanceof File) {
           formData.append(key, selectedCandidate[key]);
-        } else if (selectedCandidate[key]) {
+        } else if (selectedCandidate[key] && key !== 'id') {
           formData.append(key, selectedCandidate[key]);
         }
       });
@@ -296,11 +361,11 @@ const CandidatesList = () => {
     }
   };
 
+  // Enhanced bulk import
   const handleFileUpload = (event) => {
     const files = event.target.files;
     if (!files.length) return;
 
-    // Separate Excel file and resume files
     const excelFile = Array.from(files).find(file => 
       file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
       file.type === 'application/vnd.ms-excel'
@@ -315,7 +380,6 @@ const CandidatesList = () => {
       return;
     }
 
-    // File size validation (10MB limit)
     if (excelFile.size > 10 * 1024 * 1024) {
       alert('File size too large. Please upload a file smaller than 10MB.');
       return;
@@ -337,7 +401,8 @@ const CandidatesList = () => {
           return;
         }
 
-        // Standardize column keys to match backend exactly
+        const originalColumns = Object.keys(rawData[0] || {});
+        
         const standardizedData = rawData.map(row => {
           const cleanRow = {};
           Object.entries(row).forEach(([key, val]) => {
@@ -349,7 +414,17 @@ const CandidatesList = () => {
           return cleanRow;
         });
 
+        const expectedColumns = ['name', 'email', 'role', 'location', 'experience', 'skills', 'industry', 'gender', 'currentctc', 'expectedctc', 'notes'];
         const requiredFields = ['name', 'email'];
+
+        const standardizedColumnNames = originalColumns.map(col => 
+          col.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
+        );
+        
+        const extraColumns = originalColumns.filter((col, index) => 
+          !expectedColumns.includes(standardizedColumnNames[index])
+        );
+
         const missingData = [];
         let validCount = 0;
 
@@ -377,7 +452,8 @@ const CandidatesList = () => {
         setImportSummary({
           total: standardizedData.length,
           missing: missingData,
-          valid: validCount
+          valid: validCount,
+          extraColumns: extraColumns
         });
         setImportPopup(true);
       } catch (err) {
@@ -403,7 +479,6 @@ const CandidatesList = () => {
       const formData = new FormData();
       formData.append('file', selectedImportFile.excel);
       
-      // Append resume files
       if (selectedImportFile.resumes.length > 0) {
         selectedImportFile.resumes.forEach(resume => {
           formData.append('resumes', resume);
@@ -420,7 +495,6 @@ const CandidatesList = () => {
 
       const { created, updated, skipped, total_rows_processed } = response.data;
       
-      // Show detailed import summary
       let summaryMessage = `Import completed:\n`;
       summaryMessage += `- ${created} records created\n`;
       summaryMessage += `- ${updated} records updated\n`;
@@ -445,15 +519,15 @@ const CandidatesList = () => {
   const handleOpenEditModal = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${ENDPOINTS.candidates}${id}/`, {
+      const res = await axios.get(`${API_BASE_URL}/candidates/${id}/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       const fullData = res.data;
       const normalizedData = {
         ...fullData,
-        current_ctc: fullData.current_ctc || '',
-        expected_ctc: fullData.expected_ctc || '',
+        current_ctc: fullData.current_ctc && fullData.current_ctc !== '0' && fullData.current_ctc !== '' ? fullData.current_ctc : '',
+        expected_ctc: fullData.expected_ctc && fullData.expected_ctc !== '0' && fullData.expected_ctc !== '' ? fullData.expected_ctc : '',
         resume: fullData.resume ? `${API_BASE_URL}${fullData.resume}` : null,
         skills: fullData.skills ? fullData.skills.map(s => typeof s === 'object' ? s.name : s) : [],
       };
@@ -464,10 +538,6 @@ const CandidatesList = () => {
       console.error('Failed to fetch candidate details:', err);
       alert('Failed to load candidate details.');
     }
-  };
-
-  const handleExport = () => {
-    setExportPopup(true);
   };
 
   const handleExportConfirm = async () => {
@@ -482,7 +552,6 @@ const CandidatesList = () => {
         responseType: 'blob'
       });
 
-      // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -490,7 +559,7 @@ const CandidatesList = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      setExportPopup(false);
+      setShowExportModal(false);
     } catch (err) {
       handleApiError(err);
     } finally {
@@ -503,7 +572,6 @@ const CandidatesList = () => {
     setExportFilters({ ...exportFilters, [name]: value });
   };
 
-  // Add this function to handle filter changes
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({
@@ -512,150 +580,42 @@ const CandidatesList = () => {
     }));
   };
 
-  // Add this function to apply filters
-  const applyFilters = (candidatesList) => {
-    return candidatesList.filter(candidate => {
-      const roleMatch = !filters.role || 
-        candidate.role?.toLowerCase().includes(filters.role.toLowerCase());
-      
-      const locationMatch = !filters.location || 
-        candidate.location?.toLowerCase().includes(filters.location.toLowerCase());
-      
-      const experienceMatch = !filters.experience || 
-        candidate.experience?.toString().includes(filters.experience);
-
-      return roleMatch && locationMatch && experienceMatch;
+  const clearAllFilters = () => {
+    setFilters({
+      role: '',
+      experience: '',
+      location: '',
+      skills: ''
     });
+    setSearchTerm('');
+    setShowFilterDropdown(false);
   };
 
-  // Update useEffect to apply filters when candidates or filters change
-  useEffect(() => {
-    setFilteredCandidates(applyFilters(candidates));
-  }, [candidates, filters]);
-
-  // Update the filter button click handler
-  const handleFilterClick = () => {
-    setShowFilterModal(true);
-  };
-
-  // Update the export button click handler
-  const handleExportClick = () => {
-    setShowExportModal(true);
-  };
-
-  // Render filter modal
-  const renderFilterModal = () => (
-    <div className="modal-overlay" onClick={() => setShowFilterModal(false)}>
-      <div className="modal modal-export-filters" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Filter Candidates</h2>
-        </div>
-        <div className="modal-body">
-          <div className="form-group">
-            <label>Job Role</label>
-            <input
-              type="text"
-              name="role"
-              value={filters.role}
-              onChange={handleFilterChange}
-              placeholder="Enter job role"
-            />
-          </div>
-          <div className="form-group">
-            <label>Experience</label>
-            <input
-              type="text"
-              name="experience"
-              value={filters.experience}
-              onChange={handleFilterChange}
-              placeholder="Enter experience (e.g., 2)"
-            />
-          </div>
-          <div className="form-group">
-            <label>Location</label>
-            <input
-              type="text"
-              name="location"
-              value={filters.location}
-              onChange={handleFilterChange}
-              placeholder="Enter location"
-            />
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button 
-            className="modal-btn cancel-btn" 
-            onClick={() => {
-              setFilters({ role: '', experience: '', location: '' });
-              setShowFilterModal(false);
-            }}
-          >
-            Clear Filters
-          </button>
-          <button className="modal-btn save-btn" onClick={() => setShowFilterModal(false)}>
-            Apply Filters
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Render export modal
-  const renderExportModal = () => (
-    <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
-      <div className="modal modal-export-filters" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Export Candidates</h2>
-        </div>
-        <div className="modal-body">
-          <div className="form-group">
-            <label>Job Role</label>
-            <input
-              type="text"
-              name="role"
-              value={exportFilters.role}
-              onChange={handleExportFilterChange}
-              placeholder="Enter job role"
-            />
-          </div>
-          <div className="form-group">
-            <label>Experience</label>
-            <input
-              type="text"
-              name="experience"
-              value={exportFilters.experience}
-              onChange={handleExportFilterChange}
-              placeholder="Enter experience (e.g., 2 years)"
-            />
-          </div>
-          <div className="form-group">
-            <label>Location</label>
-            <input
-              type="text"
-              name="location"
-              value={exportFilters.location}
-              onChange={handleExportFilterChange}
-              placeholder="Enter location"
-            />
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button className="modal-btn cancel-btn" onClick={() => setShowExportModal(false)}>Cancel</button>
-          <button className="modal-btn save-btn" onClick={handleExportConfirm}>Export</button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Update the candidates count display
   const renderCandidatesCount = () => (
     <div className="header-left">
       <h1 className="page-title">Candidates</h1>
       <span className="candidates-count">
-            {candidates.length} total
+        {filteredCandidates.length} of {candidates.length} candidates
       </span>
     </div>
   );
+
+  // Click outside handler for dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showFilterDropdown && !event.target.closest('.filter-dropdown-container')) {
+        setShowFilterDropdown(false);
+      }
+      if (activeDropdownId && !event.target.closest('.dropdown-wrapper')) {
+        setActiveDropdownId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showFilterDropdown, activeDropdownId]);
 
   return (
     <div className="candidates-wrapper">
@@ -683,7 +643,7 @@ const CandidatesList = () => {
         </div>
 
         <div className="candidates-controls">
-          <div className="search-container">
+          <div className="search-filter-container">
             <div className="search-input-wrapper">
               <Search size={16} className="search-icon" />
               <input
@@ -691,17 +651,95 @@ const CandidatesList = () => {
                 className="search-input"
                 placeholder="Search candidates by name, skills, role..."
                 value={searchTerm}
-                onChange={handleSearch}
+                onChange={(e) => handleSearch(e.target.value)}
               />
+            </div>
+            
+            <div className="filter-dropdown-container">
+              <button 
+                className="btn btn-secondary filter-toggle" 
+                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+              >
+                <Filter size={16} />
+                Filters
+                {(filters.role || filters.location || filters.experience || filters.skills) && (
+                  <span className="filter-active-indicator"></span>
+                )}
+              </button>
+
+              {showFilterDropdown && (
+                <div className="filter-dropdown">
+                  <div className="filter-dropdown-header">
+                    <h4>Filter Candidates</h4>
+                    <button 
+                      className="filter-close"
+                      onClick={() => setShowFilterDropdown(false)}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                  
+                  <div className="filter-dropdown-body">
+                    <div className="filter-group">
+                      <label>Job Role</label>
+                      <input
+                        type="text"
+                        name="role"
+                        value={filters.role}
+                        onChange={handleFilterChange}
+                        placeholder="Enter job role"
+                      />
+                    </div>
+                    
+                    <div className="filter-group">
+                      <label>Location</label>
+                      <input
+                        type="text"
+                        name="location"
+                        value={filters.location}
+                        onChange={handleFilterChange}
+                        placeholder="Enter location"
+                      />
+                    </div>
+                    
+                    <div className="filter-group">
+                      <label>Experience</label>
+                      <input
+                        type="text"
+                        name="experience"
+                        value={filters.experience}
+                        onChange={handleFilterChange}
+                        placeholder="Enter experience"
+                      />
+                    </div>
+                    
+                    <div className="filter-group">
+                      <label>Skills</label>
+                      <input
+                        type="text"
+                        name="skills"
+                        value={filters.skills}
+                        onChange={handleFilterChange}
+                        placeholder="Enter skills"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="filter-dropdown-footer">
+                    <button 
+                      className="btn btn-secondary clear-filters"
+                      onClick={clearAllFilters}
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="controls-right">
-            <button className="btn btn-secondary" onClick={handleFilterClick}>
-              <Filter size={16} />
-              Filters
-            </button>
-            <button className="btn btn-secondary" onClick={handleExportClick}>
+            <button className="btn btn-secondary" onClick={() => setShowExportModal(true)}>
               <Download size={16} />
               Export
             </button>
@@ -724,7 +762,15 @@ const CandidatesList = () => {
         </div>
 
         <div className="candidates-content">
-          {view === 'table' ? (
+          {isLoading ? (
+            <div className="loading-message">Loading candidates...</div>
+          ) : filteredCandidates.length === 0 ? (
+            <div className="no-candidates-message">
+              {searchTerm || filters.role || filters.location || filters.experience || filters.skills 
+                ? 'No candidates found matching your search criteria.' 
+                : 'No candidates found. Add your first candidate!'}
+            </div>
+          ) : view === 'table' ? (
             <div className="table-container">
               <table className="candidates-table">
                 <thead>
@@ -803,12 +849,16 @@ const CandidatesList = () => {
                   </div>
                   <div className="card-role">{candidate.role}</div>
                   <div className="card-location">{candidate.location}</div>
+                  <div className="card-experience">Experience: {candidate.experience}</div>
                   <div className="card-skills">
                     {candidate.skills && candidate.skills.slice(0, 4).map((skill, index) => (
                       <span key={index} className="skill-tag">
                         {typeof skill === 'object' ? skill.name : skill}
                       </span>
                     ))}
+                    {candidate.skills && candidate.skills.length > 4 && (
+                      <span className="skill-tag skill-more">+{candidate.skills.length - 4}</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -825,21 +875,80 @@ const CandidatesList = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
-              <button className="modal-close" onClick={closeModal}>Add candidate</button>
+              <h2>{selectedCandidate ? 'Edit Candidate' : 'Add Candidate'}</h2>
+              <button className="modal-close" onClick={closeModal}>×</button>
             </div>
             <div className="modal-body">
-              {['name', 'email', 'role', 'location', 'experience', 'industry'].map(field => (
-                <div className="form-group" key={field}>
-                  <label>{field.charAt(0).toUpperCase() + field.slice(1)} {['name', 'email', 'role', 'location', 'experience'].includes(field) && '*'}</label>
-                  <input
-                    type="text"
-                    name={field}
-                    value={(selectedCandidate ? selectedCandidate[field] : newCandidate[field]) || ''}
-                    onChange={handleInputChange}
-                    required={['name', 'email', 'role', 'location', 'experience'].includes(field)}
-                  />
-                </div>
-              ))}
+              <div className="form-group">
+                <label>Name *</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={(selectedCandidate ? selectedCandidate.name : newCandidate.name) || ''}
+                  onChange={handleInputChange}
+                  placeholder="Enter full name"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Email *</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={(selectedCandidate ? selectedCandidate.email : newCandidate.email) || ''}
+                  onChange={handleInputChange}
+                  placeholder="Enter email address"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Role *</label>
+                <input
+                  type="text"
+                  name="role"
+                  value={(selectedCandidate ? selectedCandidate.role : newCandidate.role) || ''}
+                  onChange={handleInputChange}
+                  placeholder="e.g., Software Engineer, UI Designer"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Location *</label>
+                <input
+                  type="text"
+                  name="location"
+                  value={(selectedCandidate ? selectedCandidate.location : newCandidate.location) || ''}
+                  onChange={handleInputChange}
+                  placeholder="e.g., New York, San Francisco"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Experience *</label>
+                <input
+                  type="text"
+                  name="experience"
+                  value={(selectedCandidate ? selectedCandidate.experience : newCandidate.experience) || ''}
+                  onChange={handleInputChange}
+                  placeholder="e.g., 2 years, 5+ years"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Industry</label>
+                <input
+                  type="text"
+                  name="industry"
+                  value={(selectedCandidate ? selectedCandidate.industry : newCandidate.industry) || ''}
+                  onChange={handleInputChange}
+                  placeholder="e.g., Technology, Healthcare, Finance"
+                />
+              </div>
 
               <div className="form-group">
                 <label>Current CTC</label>
@@ -848,6 +957,7 @@ const CandidatesList = () => {
                   name="current_ctc"
                   value={(selectedCandidate ? selectedCandidate.current_ctc : newCandidate.current_ctc) || ''}
                   onChange={handleInputChange}
+                  placeholder="e.g., 5 LPA, 50000"
                 />
               </div>
 
@@ -858,6 +968,7 @@ const CandidatesList = () => {
                   name="expected_ctc"
                   value={(selectedCandidate ? selectedCandidate.expected_ctc : newCandidate.expected_ctc) || ''}
                   onChange={handleInputChange}
+                  placeholder="e.g., 7 LPA, 70000"
                 />
               </div>
 
@@ -865,10 +976,10 @@ const CandidatesList = () => {
                 <label>Gender</label>
                 <select
                   name="gender"
-                  value={selectedCandidate ? selectedCandidate.gender : newCandidate.gender}
+                  value={selectedCandidate ? selectedCandidate.gender || '' : newCandidate.gender || ''}
                   onChange={handleInputChange}
                 >
-                  <option value="">Select</option>
+                  <option value="">Select Gender</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                   <option value="Other">Other</option>
@@ -888,6 +999,9 @@ const CandidatesList = () => {
                     }))
                   }
                   onChange={handleSkillsChange}
+                  placeholder="Select or type skills..."
+                  className="react-select-container"
+                  classNamePrefix="react-select"
                 />
               </div>
 
@@ -896,10 +1010,10 @@ const CandidatesList = () => {
                 <input
                   type="file"
                   name="resume"
-                  accept=".pdf"
+                  accept=".pdf,.doc,.docx"
                   onChange={handleFileChange}
                 />
-                {selectedCandidate?.resume && (
+                {selectedCandidate?.resume && typeof selectedCandidate.resume === 'string' && (
                   <div className="resume-preview">
                     <p className="resume-preview-label">Current Resume:</p>
                     <div className="resume-preview-actions">
@@ -921,8 +1035,9 @@ const CandidatesList = () => {
                 <textarea
                   name="notes"
                   rows={3}
-                  value={selectedCandidate ? selectedCandidate.notes : newCandidate.notes}
+                  value={selectedCandidate ? selectedCandidate.notes || '' : newCandidate.notes || ''}
                   onChange={handleInputChange}
+                  placeholder="Additional notes about the candidate..."
                 />
               </div>
             </div>
@@ -930,16 +1045,16 @@ const CandidatesList = () => {
               <button className="modal-btn cancel-btn" onClick={closeModal}>Cancel</button>
               {selectedCandidate ? (
                 <>
-                  <button className="modal-btn save-btn" onClick={handleEditCandidate}>
-                    Save Changes
+                  <button className="modal-btn save-btn" onClick={handleEditCandidate} disabled={isLoading}>
+                    {isLoading ? 'Saving...' : 'Save Changes'}
                   </button>
-                  <button className="modal-btn delete-btn" onClick={handleDeleteCandidate}>
+                  <button className="modal-btn delete-btn" onClick={handleDeleteCandidate} disabled={isLoading}>
                     Delete
                   </button>
                 </>
               ) : (
-                <button className="modal-btn save-btn" onClick={handleAddCandidate}>
-                  Add Candidate
+                <button className="modal-btn save-btn" onClick={handleAddCandidate} disabled={isLoading}>
+                  {isLoading ? 'Adding...' : 'Add Candidate'}
                 </button>
               )}
             </div>
@@ -947,7 +1062,7 @@ const CandidatesList = () => {
         </div>
       )}
 
-      {/* Import Modal */}
+      {/* Enhanced Import Modal */}
       {importPopup && (
         <div className="modal-overlay" onClick={() => setImportPopup(false)}>
           <div className="modal modal-import-summary" onClick={(e) => e.stopPropagation()}>
@@ -956,24 +1071,43 @@ const CandidatesList = () => {
               <button className="modal-close" onClick={() => setImportPopup(false)}>×</button>
             </div>
             <div className="modal-body">
-              <p><strong>Total Records:</strong> {importSummary.total}</p>
-              <p><strong>Valid Records:</strong> {importSummary.valid}</p>
-              {importSummary.missing.length > 0 ? (
-                <>
-                  <p><strong>Records with Issues:</strong></p>
-                  <ul style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                    {importSummary.missing.map((item, index) => (
-                      <li key={index} className="error-item">
-                        <strong>Row {item.row}:</strong> {item.error}
-                      </li>
+              <div className="import-stats">
+                <p><strong>Total Records:</strong> {importSummary.total}</p>
+                <p><strong>Valid Records:</strong> {importSummary.valid}</p>
+              </div>
+
+              {importSummary.extraColumns.length > 0 && (
+                <div className="extra-columns-section">
+                  <p><strong>Extra Columns Detected:</strong></p>
+                  <div className="extra-columns-list">
+                    {importSummary.extraColumns.map((col, index) => (
+                      <span key={index} className="extra-column-tag">
+                        {col}
+                      </span>
                     ))}
-                  </ul>
+                  </div>
+                  <p className="extra-columns-note">
+                    <em>These additional columns will be imported and stored as part of the candidate data.</em>
+                  </p>
+                </div>
+              )}
+
+              {importSummary.missing.length > 0 ? (
+                <div className="errors-section">
+                  <p><strong>Records with Issues:</strong></p>
+                  <div className="errors-list" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {importSummary.missing.map((item, index) => (
+                      <div key={index} className="error-item">
+                        <strong>Row {item.row}:</strong> {item.error}
+                      </div>
+                    ))}
+                  </div>
                   <p className="warning-text">
                     <em>Records with issues will be skipped during import.</em>
                   </p>
-                </>
+                </div>
               ) : (
-                <p className="success-text">✅ All records are valid!</p>
+                <p className="success-text">All records are valid!</p>
               )}
             </div>
             <div className="modal-footer">
@@ -981,27 +1115,84 @@ const CandidatesList = () => {
               <button 
                 className="modal-btn save-btn" 
                 onClick={handleConfirmImport}
-                disabled={importSummary.valid === 0}
+                disabled={importSummary.valid === 0 || isLoading}
               >
-                Confirm Import
+                {isLoading ? 'Importing...' : `Import ${importSummary.valid} Records`}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modals */}
-      {showFilterModal && renderFilterModal()}
-      {showExportModal && renderExportModal()}
-
-      {error && (
-        <div className="error-message">
-          {error}
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
+          <div className="modal modal-export-filters" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Export Candidates</h2>
+              <button className="modal-close" onClick={() => setShowExportModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="export-description">
+                Export candidates to Excel file. Leave filters empty to export all candidates.
+              </p>
+              
+              <div className="form-group">
+                <label>Job Role</label>
+                <input
+                  type="text"
+                  name="role"
+                  value={exportFilters.role}
+                  onChange={handleExportFilterChange}
+                  placeholder="Filter by job role"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Experience</label>
+                <input
+                  type="text"
+                  name="experience"
+                  value={exportFilters.experience}
+                  onChange={handleExportFilterChange}
+                  placeholder="Filter by experience"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Location</label>
+                <input
+                  type="text"
+                  name="location"
+                  value={exportFilters.location}
+                  onChange={handleExportFilterChange}
+                  placeholder="Filter by location"
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="modal-btn cancel-btn" onClick={() => setShowExportModal(false)}>Cancel</button>
+              <button className="modal-btn save-btn" onClick={handleExportConfirm} disabled={isLoading}>
+                {isLoading ? 'Exporting...' : 'Export Excel'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="error-message">
+          <span>{error}</span>
+          <button className="error-close" onClick={() => setError(null)}>×</button>
+        </div>
+      )}
+
+      {/* Loading Overlay */}
       {isLoading && (
         <div className="loading-overlay">
           <div className="loading-spinner"></div>
+          <p className="loading-text">Processing...</p>
         </div>
       )}
     </div>
