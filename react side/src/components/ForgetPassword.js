@@ -12,7 +12,7 @@ const ForgetPassword = () => {
   const handleRequestReset = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:8000/request-reset/', { email });
+      await axios.post('/api/request-reset/', { email });
       alert('Reset code sent to your email!');
       setStep(2);
     } catch (err) {
@@ -27,7 +27,7 @@ const ForgetPassword = () => {
       return;
     }
     try {
-      await axios.post('http://localhost:8000/reset-password/', {
+      await axios.post('/api/reset-password/', {
         reset_code: resetCode,
         new_password: newPassword,
       });

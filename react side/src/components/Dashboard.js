@@ -14,7 +14,7 @@ const Dashboard = () => {
     const fetchCandidates = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:8000/candidates/', {
+        const res = await axios.get('/api/candidates/', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setCandidates(res.data);

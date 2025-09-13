@@ -7,8 +7,8 @@ import Select from 'react-select';
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
 
-// API endpoints
-const API_BASE_URL = 'http://localhost:8000';
+// API endpoints - using relative URLs for production
+const API_BASE_URL = '/api';
 const ENDPOINTS = {
   candidates: `${API_BASE_URL}/candidates/`,
   addCandidate: `${API_BASE_URL}/add-candidate/`,

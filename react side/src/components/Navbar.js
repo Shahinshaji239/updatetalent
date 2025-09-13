@@ -31,7 +31,7 @@ const Navbar = () => {
     const token = localStorage.getItem('token');
     const refreshToken = localStorage.getItem('refresh_token');
     try {
-      await axios.post('http://localhost:8000/logout/', {
+      await axios.post('/api/logout/', {
         refresh_token: refreshToken,
       }, {
         headers: {
@@ -54,7 +54,7 @@ const Navbar = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
       try {
-        const res = await axios.get('http://localhost:8000/profile/', {
+        const res = await axios.get('/api/profile/', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUserDetails(res.data);

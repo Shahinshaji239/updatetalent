@@ -34,7 +34,7 @@ export default function Signup() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:8000/login/', { email, password });
+      const response = await axios.post('/api/login/', { email, password });
       const token = response.data.access;
       localStorage.setItem('token', token);
       navigate('/dashboard');
@@ -64,7 +64,7 @@ export default function Signup() {
     }
 
     try {
-      const response = await axios.post('http://localhost:8000/signup/', { 
+      const response = await axios.post('/api/signup/', { 
         name: username, 
         email, 
         password 
@@ -87,7 +87,7 @@ export default function Signup() {
   const handleVerify = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:8000/verify-email/', { 
+      const response = await axios.post('/api/verify-email/', { 
         email, 
         code: verificationCode 
       });
@@ -107,7 +107,7 @@ export default function Signup() {
     if (resendTimer > 0) return;
     
     try {
-      await axios.post('http://localhost:8000/resend-verification/', { email });
+      await axios.post('/api/resend-verification/', { email });
       setResendTimer(60);
       alert('Verification code resent!');
     } catch (error) {
